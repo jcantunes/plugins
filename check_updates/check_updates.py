@@ -13,8 +13,12 @@ data['heartbeat_required']=HEARTBEAT
 
 command_check_dnf="type dnf"
 command_yum="yum check-update --security | grep -i 'needed for security'"
-command_dnf_security="dnf --refresh -q check-update --security | sed '/Obsoleting Packages/,$d' | grep . | wc -l"
-command_dnf_all="dnf -q check-update | sed '/Obsoleting Packages/,$d' | grep . | wc -l"
+command_dnf_security="dnf --refresh -q check-update --security |sed '/Obsoleting Packages/,$d' | grep . | wc -l"
+command_dnf_all="dnf -q check-update |sed '/Obsoleting Packages/,$d' | grep . | wc -l"
+
+command_check_unattended_upgrade="type unattended-upgrade"
+command_debian_security="unattended-upgrade --dry-run 2>&1 | grep unpack | wc -l"
+command_debian_all="(apt-get update && apt-get upgrade --dry-run) | grep '^Inst' | wc -l"
 
 os_info = platform.linux_distribution()[0].lower()
 
@@ -48,13 +52,14 @@ if 'centos' in os_info or 'red hat' in os_info:
                     if each.isdigit():
                         data['packages_to_be_updated']=each
                 
-else:    
-    file_path='/var/lib/update-notifier/updates-available'
-    lines = [line.strip('\n') for line in open(file_path)]
-    for line in lines:
-        if line:
-            if ( 'packages can be updated' in line ) or ('can be installed immediately' in line ):
-                data['packages_to_be_updated'] = line.split()[0]
-            if 'updates are security updates' in line:
-                data['security_updates'] = line.split()[0]
+else:
+    unattended_upgrade = get_command_output(command_check_unattended_upgrade)
+    if unattended_upgrade:
+        out = get_command_output(command_debian_security)
+        if out:
+            data['security_updates'] = out.split()[0]
+    out = get_command_output(command_debian_all)
+    if out:
+        data['packages_to_be_updated'] = out.split()[0]
+
 print(json.dumps(data))
